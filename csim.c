@@ -12,21 +12,26 @@
 #include <stdio.h>
 #include <string.h>
 
-char t[200]; /* trace file path*/
+char traceFile[200]; /* trace file path*/
 int s; /* s: S=2^s is the set number */
 int E; /* E: num of lines in each set */
 int b; /* b: B=2^b is the size of each block in bytes */
 
-int getCli(int argc, char **argv, int *s, int *E, int *b, char *t);
+int getCli(int argc, char **argv, int *s, int *E, int *b, char *traceFile);
 
 int main(int argc, char *argv[]) {
     /* set the parameter s E b t from the command line input*/
-    getCli(argc, argv, &s, &E, &b, t); 
+    getCli(argc, argv, &s, &E, &b, traceFile); 
 
     /* ************ TO DO ************ */
     /* check if the s,B,b parameter is valid*/
 
-    /*
+    /* ************ TO DO ************ */
+    /* initialize the cache */
+
+    /* ************ TO DO ************ */
+    /* read the trace file from t*/
+
 }
 
 /* ***************************************************
@@ -36,21 +41,21 @@ int main(int argc, char *argv[]) {
  * @param 
  * @return 
  * ***************************************************/
-int getCli(int argc, char **argv, int *s, int *E, int *b, char *t){
+int getCli(int argc, char **argv, int *s, int *E, int *b, char *traceFile){
     int opt;
     while(-1 != (opt = optget(argc, argv, "hvs:E:b:t:"))) {
         switch (opt) {
             case 's':
-                s = atoi(optarg); /* convert s from string to int*/
+                *s = atoi(optarg); /* convert s from string to int */
                 break;
             case 'E':
-                E = atoi(optarg); /* convert E from string to int*/
+                *E = atoi(optarg); /* convert E from string to int */
                 break;
             case 'b':
-                b = atoi(optarg); /* convert b from string to int*/
+                *b = atoi(optarg); /* convert b from string to int */
                 break;
             case 't':
-                strcpy(t, optarg); /* copy the trace file path to t*/
+                strcpy(traceFile, optarg); /* copy the trace file path to t */
                 break;
             case 'v':
                 /* ******** to do verbose ********* */
