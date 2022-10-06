@@ -52,16 +52,15 @@ int main(int argc, char **argv) {
     /* ************ TO DO ************ */
     /* check if the s,B,b parameter is valid */
 
-    /* ************ TO DO ************ */
     /* initialize the cache */
     malloc_cache();
 
-    /* ************ TO DO ************ */
     /* read the trace file from t */
     readTrace();
 
     /* ************ TO DO ************ */
     /* free the cache */
+    free_cache();
 
     /* ************ TO DO ************ */
     /* print summary about hit miss eviction */
@@ -123,9 +122,9 @@ int malloc_cache() {
     cache->S = (1 << s); /* S = 2^s */
     cache->E = E;
     cache->B = (1 << b); /* B = 2^b */
-    cache->set = (CacheLine **) malloc(sizeof(CacheLine *) * cache->S);
+    cache->set = (CacheLine **) malloc(sizeof(CacheLine *) * (cache->S));
 
-    for(int i = 0; i < cache->S; i++) {
+    for(int i = 0; i < (cache->S); i++) {
         cache->set[i] = (CacheLine *) malloc(sizeof(CacheLine) * E);
         for(int j = 0; j < E; j++) {
             cache->set[i][j].valid = 0;
@@ -167,5 +166,19 @@ int readTrace() {
     }
 
     fclose(pFile);
+    return 0;
+}
+
+/**
+ * Description: 
+ *     free cache line, cache set and cache space 
+ *     created by malloc in malloc_cache() function
+ */
+int free_cache() {
+    for(int i = 0; i < (cache->S); i++) {
+        free(cache->set[i]); /* free cache line */
+    }
+    free(cache->set); /* free cache set */
+    free(cache); /* free whole cache */
     return 0;
 }
