@@ -32,15 +32,18 @@ typedef struct {
     int S;
     int E;
     int B;
-    CacheLine **line ;
+    CacheLine **set ;
 } Cache;
+
+Cache *cache = NULL;
 
 /* store num of hits, miss, eviction miss, dirty bits and dirty evictions */
 csim_stats_t cache_stats = {0,0,0,0,0};
 
 int getCli(int argc, char **argv, int *s, int *E, int *b, char *traceFile);
 int readTrace();
-int init_cache();
+int malloc_cache();
+int free_cache();
 
 int main(int argc, char **argv) {
     /* set the parameter s E b t from the command line input */
@@ -51,7 +54,8 @@ int main(int argc, char **argv) {
 
     /* ************ TO DO ************ */
     /* initialize the cache */
-    init_cache();
+    malloc_cache();
+
     /* ************ TO DO ************ */
     /* read the trace file from t */
     readTrace();
@@ -69,7 +73,7 @@ int main(int argc, char **argv) {
 /**
  * Description: 
  *     Read command from command line,
- *     and then set parameter for the cache simulator
+ *     and then set parameter for the cache simulator.
  * @param argv is an array of strings, each accessible as a char*
  * @return 
  */
@@ -111,7 +115,31 @@ int getCli(int argc, char **argv, int *s, int *E, int *b, char *traceFile){
 
 /**
  * Description: 
- *     Read and execute each line of instruction from the trace file
+ *     Initialize parameter S, E, B for the cache,
+ *     and use malloc to create space for cache and each cache line.
+ */
+int malloc_cache() {
+    cache = (Cache *) malloc(sizeof(Cache));
+    cache->S = (1 << s); /* S = 2^s */
+    cache->E = E;
+    cache->B = (1 << b); /* B = 2^b */
+    cache->set = (CacheLine **) malloc(sizeof(CacheLine *) * cache->S);
+
+    for(int i = 0; i < cache->S; i++) {
+        cache->set[i] = (CacheLine *) malloc(sizeof(CacheLine) * E);
+        for(int j = 0; j < E; j++) {
+            cache->set[i][j].valid = 0;
+            cache->set[i][j].tag = 0;
+            cache->set[i][j].LRU_time_stamp = 0;
+        }
+    }
+    return 0;
+}
+
+
+/**
+ * Description: 
+ *     Read and execute each line of instruction from the trace file,
  *     and  update data in cache.
  */
 int readTrace() {
