@@ -2,7 +2,7 @@
  * @ File Name: csim.c
  * @ Author: Xianwei Zou
  * @ AndrewID: xianweiz
- * @ Version: 1.0.0
+ * @ Version: 1.1.0
  * @ Description: Simulate the behavior of a cache
  */
 
@@ -46,8 +46,13 @@ int getCli(int argc, char **argv, int *s, int *E, int *b, char *traceFile);
 int readTrace(void);
 int malloc_cache(void);
 int free_cache(void);
+int load_op(unsigned long set_bits, unsigned long tag_bits);
+int store_op(unsigned long set_bits, unsigned long tag_bits);
 int find_max_LRU(unsigned long set_bits);
+int eviction_effect(int idx, unsigned long set_bits);
+int update_bits(int idx, unsigned long set_bits, unsigned long tag_bits);
 int update_time(int idx, unsigned long set_bits);
+int print_help(void);
 
 int main(int argc, char **argv) {
     /* set the parameter s E b t from the command line input */
@@ -59,7 +64,9 @@ int main(int argc, char **argv) {
     /* read the trace file from traceFile */
     readTrace();
 
+    /* calculate the dirty bytes in cache in the end */
     cache_stats.dirty_bytes = (unsigned long)cache->B * cache_stats.dirty_bytes;
+    /* dirty bytes evicted in the process */
     cache_stats.dirty_evictions =
         (unsigned long)cache->B * cache_stats.dirty_evictions;
 
@@ -84,30 +91,24 @@ int getCli(int argc, char **argv, int *s, int *E, int *b, char *traceFile) {
         switch (opt) {
         case 's':
             *s = atoi(optarg); /* convert s from string to int */
-            // printf("s=%d\n", *s);
             break;
         case 'E':
             *E = atoi(optarg); /* convert E from string to int */
-            // printf("E=%d\n", *E);
             break;
         case 'b':
             *b = atoi(optarg); /* convert b from string to int */
-            // printf("b=%d\n", *b);
             break;
         case 't':
             strcpy(traceFile, optarg); /* copy the trace file path to t */
-            // printf("traceFile=%s\n", traceFile);
             break;
         case 'v':
             verbose = 1;
             break;
         case 'h':
-            /* ******** to do help ************ */
-            // printf("wrong argument\n");
+            print_help();
             break;
         default:
-            /* ******** to do default ********* */
-            // printf("wrong argument\n");
+            printf("wrong argument\n");
             break;
         }
     }
@@ -152,7 +153,7 @@ int malloc_cache(void) {
 /**
  * Description:
  *     Read and execute each line of instruction from the trace file,
- *     and  update data in cache.
+ *     and update bits in cache.
  */
 int readTrace(void) {
     FILE *pFile;
@@ -177,117 +178,13 @@ int readTrace(void) {
         } else {
             set_bits = ((address << t) >> (t + b));
         }
-        // int set_bits = (address >> b) & ((unsigned)(-1) >> (8 *
-        // sizeof(unsigned) - s));
-        printf("op=%c\n", opIdentifier);
-        printf("address=%lx\n", address);
-        // printf("tag_bits=%lx\n", tag_bits);
-        // printf("tag_bits=%d\n", tag_bits);
-        // printf("set_bits=%lx\n\n", set_bits);
-        // printf("set_bits=%d\n\n", set_bits);
-
         /* For Load operation */
         if (opIdentifier == 'L') {
-            /* set selection and line match*/
-            int i;
-            bool hit_flag = false;
-            for (i = 0; i < cache->E; i++) {
-                /* Hit: when the set bits and the valid bits both match */
-                if ((cache->set[set_bits][i].tag == tag_bits) &&
-                    (cache->set[set_bits][i].valid == 1)) {
-                    /* count this hit */
-                    cache_stats.hits++;
-                    if (verbose)
-                        printf("Hit\n");
-                    /* update time, valid bit and tag bit */
-                    update_time(i, set_bits);
-                    hit_flag = true;
-                }
-            }
-
-            /* Miss: when hits nothing in the cache */
-            if (hit_flag == false) {
-                /* count the miss */
-                cache_stats.misses++;
-                if (verbose)
-                    printf("Miss\n");
-                /* find the cache line has the least LRU number */
-                int max_idx = find_max_LRU(set_bits);
-
-                /* put the value into a cache line which has the least LRU
-                 * number */
-                if (cache->set[set_bits][max_idx].valid == 1) {
-                    cache_stats.evictions++;
-                    if (verbose)
-                        printf("Evictions\n\n");
-                    if (cache->set[set_bits][max_idx].dirty == 1) {
-                        cache_stats.dirty_evictions++;
-                        cache->set[set_bits][max_idx].dirty = 0;
-                        cache_stats.dirty_bytes--;
-                    }
-                }
-                /* read data from low memory write to cache line */
-                cache->set[set_bits][max_idx].valid = 1;
-                cache->set[set_bits][max_idx].tag = tag_bits;
-                /* update time */
-                update_time(max_idx, set_bits);
-            }
+            load_op(set_bits, tag_bits);
         }
-
+        /* For Store operation */
         if (opIdentifier == 'S') {
-            /* set selection and line match*/
-            int i;
-            bool hit_flag = false;
-            for (i = 0; i < cache->E; i++) {
-                /* Hit: when the set bits and the valid bits both match */
-                if ((cache->set[set_bits][i].tag == tag_bits) &&
-                    (cache->set[set_bits][i].valid == 1)) {
-                    /* count this hit */
-                    cache_stats.hits++;
-                    if (verbose)
-                        printf("Hit\n");
-                    /* update time, valid bit and tag bit */
-                    update_time(i, set_bits);
-                    /* set the dirty bit */
-                    if (cache->set[set_bits][i].dirty == 0) {
-                        cache->set[set_bits][i].dirty = 1;
-                        cache_stats.dirty_bytes++;
-                    }
-                    hit_flag = true;
-                }
-            }
-
-            /* Miss: when hits nothing in the cache */
-            if (hit_flag == false) {
-                /* count the miss */
-                cache_stats.misses++;
-                if (verbose)
-                    printf("Miss\n");
-
-                /* find the cache line has the least LRU number */
-                int max_idx = find_max_LRU(set_bits);
-
-                /* put the value into a cache line which has the least LRU
-                 * number */
-                if (cache->set[set_bits][max_idx].valid == 1) {
-                    cache_stats.evictions++;
-                    if (verbose)
-                        printf("Evictions\n\n");
-                    if (cache->set[set_bits][max_idx].dirty == 1) {
-                        cache_stats.dirty_evictions++;
-                        cache->set[set_bits][max_idx].dirty = 0;
-                        cache_stats.dirty_bytes--;
-                    }
-                }
-                /* update time, valid bit and tag bit */
-                cache->set[set_bits][max_idx].valid = 1;
-                cache->set[set_bits][max_idx].tag = tag_bits;
-                update_time(max_idx, set_bits);
-
-                /* set the dirty bits after write */
-                cache->set[set_bits][max_idx].dirty = 1;
-                cache_stats.dirty_bytes++;
-            }
+            store_op(set_bits, tag_bits);
         }
     }
 
@@ -295,6 +192,131 @@ int readTrace(void) {
     return 0;
 }
 
+/**
+ * @brief Operations to cache when the opcode is Load.
+ * @param set_bits set bits in the memory address
+ * @param tag_bits tag bits of the memory address
+ */
+int load_op(unsigned long set_bits, unsigned long tag_bits) {
+    /* set selection and line match*/
+    int i;
+    bool hit_flag = false;
+    for (i = 0; i < cache->E; i++) {
+        /* Hit: when the set bits and the valid bits both match */
+        if ((cache->set[set_bits][i].tag == tag_bits) &&
+            (cache->set[set_bits][i].valid == 1)) {
+            /* count this hit */
+            cache_stats.hits++;
+            if (verbose)
+                printf("Hit\n");
+            /* update time, valid bit and tag bit */
+            update_time(i, set_bits);
+            hit_flag = true;
+        }
+    }
+
+    /* Miss: when hits nothing in the cache */
+    if (hit_flag == false) {
+        /* count the miss */
+        cache_stats.misses++;
+        if (verbose)
+            printf("Miss\n");
+        /* find the cache line has the least LRU number */
+        int max_idx = find_max_LRU(set_bits);
+
+        /* Eviction miss when the cache set is full,
+         * which means the line has the max LRU has valid bit = 1
+         */
+        eviction_effect(max_idx, set_bits);
+
+        /* update time, valid bit and tag bit */
+        update_bits(max_idx, set_bits, tag_bits);
+        update_time(max_idx, set_bits);
+    }
+    return 0;
+}
+
+/**
+ * @brief Operations to cache when the opcode is Store.
+ * @param set_bits set bits in the memory address
+ * @param tag_bits tag bits of the memory address
+ */
+int store_op(unsigned long set_bits, unsigned long tag_bits) {
+    /* set selection and line match*/
+    int i;
+    bool hit_flag = false;
+    for (i = 0; i < cache->E; i++) {
+        /* Hit: when the set bits and the valid bits both match */
+        if ((cache->set[set_bits][i].tag == tag_bits) &&
+            (cache->set[set_bits][i].valid == 1)) {
+            /* count this hit */
+            cache_stats.hits++;
+            if (verbose)
+                printf("Hit\n");
+            /* update time, valid bit and tag bit */
+            update_time(i, set_bits);
+            /* set the dirty bit */
+            if (cache->set[set_bits][i].dirty == 0) {
+                cache->set[set_bits][i].dirty = 1;
+                cache_stats.dirty_bytes++;
+            }
+            hit_flag = true;
+        }
+    }
+
+    /* Miss: when hits nothing in the cache */
+    if (hit_flag == false) {
+        /* count the miss */
+        cache_stats.misses++;
+        if (verbose)
+            printf("Miss\n");
+
+        /* find the cache line has the least LRU number */
+        int max_idx = find_max_LRU(set_bits);
+
+        /* Eviction miss when the cache set is full,
+         * which means the line has the max LRU has valid bit = 1
+         */
+        eviction_effect(max_idx, set_bits);
+
+        /* update time, valid bit and tag bit */
+        update_bits(max_idx, set_bits, tag_bits);
+        update_time(max_idx, set_bits);
+
+        /* set the dirty bits after write */
+        cache->set[set_bits][max_idx].dirty = 1;
+        cache_stats.dirty_bytes++;
+    }
+    return 0;
+}
+
+/**
+ * @brief Change bits and count dirty bytes after determing if
+ *      eviction miss happens
+ * @param idx index of the set
+ * @param set_bits set bits in the memory address
+ */
+int eviction_effect(int idx, unsigned long set_bits) {
+    /* if eviction happens */
+    if (cache->set[set_bits][idx].valid == 1) {
+        cache_stats.evictions++;
+        if (verbose)
+            printf("Evictions\n\n");
+        if (cache->set[set_bits][idx].dirty == 1) {
+            cache_stats.dirty_evictions++;
+            cache->set[set_bits][idx].dirty = 0;
+            cache_stats.dirty_bytes--;
+        }
+    }
+    return 0;
+}
+
+/**
+ * @brief After each hit or miss,
+ *      update the time in LRU time stamp.
+ * @param idx index of the set
+ * @param set_bits set bits in the memory address
+ */
 int update_time(int idx, unsigned long set_bits) {
     int i;
     for (i = 0; i < cache->E; i++) {
@@ -307,10 +329,23 @@ int update_time(int idx, unsigned long set_bits) {
 }
 
 /**
+ * @brief Update the bits in each cache line after miss
+ *
+ * @param idx index of the set
+ * @param set_bits set bits in the memory address
+ * @param tag_bits tag bits in the memory address
+ */
+int update_bits(int idx, unsigned long set_bits, unsigned long tag_bits) {
+    cache->set[set_bits][idx].valid = 1;
+    cache->set[set_bits][idx].tag = tag_bits;
+    return 0;
+}
+
+/**
  * @brief Given the set number, return the setline index of the line,
  * that has the minimum LRU value.
  *
- * @param set_bits
+ * @param set_bits set bits in the memory address
  */
 int find_max_LRU(unsigned long set_bits) {
     int i;
@@ -327,7 +362,7 @@ int find_max_LRU(unsigned long set_bits) {
 
 /**
  * Description:
- *     free cache line, cache set and cache space
+ *     free cache line, cache set and cache space.
  *     created by malloc in malloc_cache() function
  */
 int free_cache(void) {
@@ -337,5 +372,21 @@ int free_cache(void) {
     }
     free(cache->set); /* free cache set */
     free(cache);      /* free whole cache */
+    return 0;
+}
+
+/**
+ * Description:
+ *     print help when entering command in the cli.
+ */
+int print_help() {
+    printf("Format: ./csim [-hv] -s <num> -E <num> -b <num> -t <file>\n");
+    printf("Options:\n");
+    printf("-s <num>   Number of set index bits.\n");
+    printf("-E <num>   Number of lines per set.\n");
+    printf("-b <num>   Number of block offset bits.\n");
+    printf("-t <file>  Trace file path name.\n\n");
+    printf("-h         OPTIONAL: Print help.\n");
+    printf("-v         OPTIONAL: verbose flag.\n");
     return 0;
 }
