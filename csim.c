@@ -46,8 +46,8 @@ int getCli(int argc, char **argv, int *s, int *E, int *b, char *traceFile);
 int readTrace(void);
 int malloc_cache(void);
 int free_cache(void);
-int find_max_LRU (int set_bits);
-int update_time(int idx, int set_bits);
+int find_max_LRU(unsigned long set_bits);
+int update_time(int idx, unsigned long set_bits);
 
 int main(int argc, char **argv) {
     /* set the parameter s E b t from the command line input */
@@ -59,8 +59,9 @@ int main(int argc, char **argv) {
     /* read the trace file from traceFile */
     readTrace();
 
-    cache_stats.dirty_bytes = cache->B * cache_stats.dirty_bytes;
-    cache_stats.dirty_evictions = cache->B * cache_stats.dirty_evictions;
+    cache_stats.dirty_bytes = (unsigned long)cache->B * cache_stats.dirty_bytes;
+    cache_stats.dirty_evictions =
+        (unsigned long)cache->B * cache_stats.dirty_evictions;
 
     /* free the cache */
     free_cache();
@@ -131,11 +132,13 @@ int malloc_cache(void) {
     } else {
         cache->B = (1 << b); /* B = 2^b */
     }
-    cache->set = (CacheLine **)malloc(sizeof(CacheLine *) * (cache->S));
+    cache->set =
+        (CacheLine **)malloc(sizeof(CacheLine *) * (unsigned long)(cache->S));
 
     int i, j;
     for (i = 0; i < (cache->S); i++) {
-        cache->set[i] = (CacheLine *)malloc(sizeof(CacheLine) * (cache->E));
+        cache->set[i] =
+            (CacheLine *)malloc(sizeof(CacheLine) * (unsigned long)(cache->E));
         for (j = 0; j < (cache->E); j++) {
             cache->set[i][j].valid = 0;
             cache->set[i][j].dirty = 0;
@@ -174,7 +177,8 @@ int readTrace(void) {
         } else {
             set_bits = ((address << t) >> (t + b));
         }
-        // int set_bits = (address >> b) & ((unsigned)(-1) >> (8 * sizeof(unsigned) - s));
+        // int set_bits = (address >> b) & ((unsigned)(-1) >> (8 *
+        // sizeof(unsigned) - s));
         printf("op=%c\n", opIdentifier);
         printf("address=%lx\n", address);
         // printf("tag_bits=%lx\n", tag_bits);
@@ -193,7 +197,7 @@ int readTrace(void) {
                     (cache->set[set_bits][i].valid == 1)) {
                     /* count this hit */
                     cache_stats.hits++;
-                    if(verbose)
+                    if (verbose)
                         printf("Hit\n");
                     /* update time, valid bit and tag bit */
                     update_time(i, set_bits);
@@ -205,16 +209,16 @@ int readTrace(void) {
             if (hit_flag == false) {
                 /* count the miss */
                 cache_stats.misses++;
-                if(verbose)
+                if (verbose)
                     printf("Miss\n");
                 /* find the cache line has the least LRU number */
-                int max_idx = find_max_LRU (set_bits);
+                int max_idx = find_max_LRU(set_bits);
 
                 /* put the value into a cache line which has the least LRU
                  * number */
                 if (cache->set[set_bits][max_idx].valid == 1) {
                     cache_stats.evictions++;
-                    if(verbose)
+                    if (verbose)
                         printf("Evictions\n\n");
                     if (cache->set[set_bits][max_idx].dirty == 1) {
                         cache_stats.dirty_evictions++;
@@ -240,13 +244,12 @@ int readTrace(void) {
                     (cache->set[set_bits][i].valid == 1)) {
                     /* count this hit */
                     cache_stats.hits++;
-                    if(verbose)
+                    if (verbose)
                         printf("Hit\n");
                     /* update time, valid bit and tag bit */
                     update_time(i, set_bits);
                     /* set the dirty bit */
-                    if (cache->set[set_bits][i].dirty == 0)
-                    {
+                    if (cache->set[set_bits][i].dirty == 0) {
                         cache->set[set_bits][i].dirty = 1;
                         cache_stats.dirty_bytes++;
                     }
@@ -258,17 +261,17 @@ int readTrace(void) {
             if (hit_flag == false) {
                 /* count the miss */
                 cache_stats.misses++;
-                if(verbose)
+                if (verbose)
                     printf("Miss\n");
 
                 /* find the cache line has the least LRU number */
-                int max_idx = find_max_LRU (set_bits);
+                int max_idx = find_max_LRU(set_bits);
 
                 /* put the value into a cache line which has the least LRU
                  * number */
                 if (cache->set[set_bits][max_idx].valid == 1) {
                     cache_stats.evictions++;
-                    if(verbose)
+                    if (verbose)
                         printf("Evictions\n\n");
                     if (cache->set[set_bits][max_idx].dirty == 1) {
                         cache_stats.dirty_evictions++;
@@ -292,9 +295,9 @@ int readTrace(void) {
     return 0;
 }
 
-int update_time(int idx, int set_bits) {
+int update_time(int idx, unsigned long set_bits) {
     int i;
-    for(i = 0; i < cache->E; i++){
+    for (i = 0; i < cache->E; i++) {
         /* increase all time */
         cache->set[set_bits][i].LRU_time_stamp++;
     }
@@ -303,14 +306,13 @@ int update_time(int idx, int set_bits) {
     return 0;
 }
 
-
 /**
  * @brief Given the set number, return the setline index of the line,
  * that has the minimum LRU value.
  *
  * @param set_bits
  */
-int find_max_LRU (int set_bits) {
+int find_max_LRU(unsigned long set_bits) {
     int i;
     int max_LRU = 0;
     int max_idx = 0;
@@ -337,4 +339,3 @@ int free_cache(void) {
     free(cache);      /* free whole cache */
     return 0;
 }
-
