@@ -25,8 +25,8 @@
  *   - You may not use unions, casting, global variables, or
  *     other tricks to hide array data in other forms of local or global memory.
  *
- * TODO: fill in your name and Andrew ID below.
- * @author Your Name <andrewid@andrew.cmu.edu>
+ * TODO: xianweiz
+ * @author Xianwei Zou <xianweiz@andrew.cmu.edu>
  */
 
 #include <assert.h>
@@ -48,6 +48,11 @@
  *
  * @return True if B is the transpose of A, and false otherwise.
  */
+
+void transpose_32(size_t M, size_t N, double A[N][M], double B[M][N],
+                  double tmp[TMPCOUNT]);
+void transpose_1024(size_t M, size_t N, double A[N][M], double B[M][N],
+                    double tmp[TMPCOUNT]);
 #ifndef NDEBUG
 static bool is_transpose(size_t M, size_t N, double A[N][M], double B[M][N]) {
     for (size_t i = 0; i < N; i++) {
@@ -124,10 +129,54 @@ static void trans_tmp(size_t M, size_t N, double A[N][M], double B[M][N],
  */
 static void transpose_submit(size_t M, size_t N, double A[N][M], double B[M][N],
                              double tmp[TMPCOUNT]) {
-    if (M == N)
-        trans_basic(M, N, A, B, tmp);
-    else
+    if (M == 32 && N == 32) {
+        transpose_32(M, N, A, B, tmp);
+    } else if (M == 1024 && N == 1024) {
+        transpose_1024(M, N, A, B, tmp);
+    } else {
         trans_tmp(M, N, A, B, tmp);
+    }
+}
+
+void transpose_32(size_t M, size_t N, double A[N][M], double B[M][N],
+                  double tmp[TMPCOUNT]) {
+    // clock cycle: 40832
+    // for (size_t i = 0; i < 32; i += 8) {
+    //     for (size_t j = 0; j < 32; j += 8) {
+    //         for (size_t m = i; m < i + 8; m++) {
+    //             for (size_t n = j; n < j + 8; n++) {
+    //                 B[n][m] = A[m][n];
+    //             }
+    //         }
+    //     }
+    // }
+
+    for (size_t i = 0; i < N; i += 8) {
+        for (size_t j = 0; j < M; j += 8) {
+            for (size_t m = i; m < i + 8; m++) {
+                for (size_t n = j; n < j + 8; n++) {
+                    if (m != n) {
+                        B[n][m] = A[m][n];
+                    }
+                    if (n == (j + 7) && (i == j)) {
+                        B[m][m] = A[m][m];
+                    }
+                }
+            }
+        }
+    }
+}
+void transpose_1024(size_t M, size_t N, double A[N][M], double B[M][N],
+                    double tmp[TMPCOUNT]) {
+    for (size_t i = 0; i < N; i += 8) {
+        for (size_t j = 0; j < M; j += 8) {
+            for (size_t m = i; m < i + 8; m++) {
+                for (size_t n = j; n < j + 8; n++) {
+                    B[n][m] = A[m][n];
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -140,6 +189,8 @@ static void transpose_submit(size_t M, size_t N, double A[N][M], double B[M][N],
 void registerFunctions(void) {
     // Register the solution function. Do not modify this line!
     registerTransFunction(transpose_submit, SUBMIT_DESCRIPTION);
+    // registerTransFunction(transpose_32, SUBMIT_DESCRIPTION);
+    // registerTransFunction(transpose_1024, SUBMIT_DESCRIPTION);
 
     // Register any additional transpose functions
     registerTransFunction(trans_basic, "Basic transpose");
